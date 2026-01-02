@@ -14,6 +14,7 @@ use Jez500\WebScraperForLaravel\Exceptions\DomSelectorException;
 use Jez500\WebScraperForLaravel\Facades\WebScraper;
 use Jez500\WebScraperForLaravel\WebScraperInterface;
 use Symfony\Component\DomCrawler\Crawler;
+use InvalidArgumentException;
 
 class AutoCreateStore
 {
@@ -60,10 +61,14 @@ class AutoCreateStore
 
     public static function createStoreFromUrl(string $url): ?Store
     {
-        // Check if store exists.
-        $host = strtolower(Uri::of($url)->host());
+        // Check if store exists by normalized domain
+        try {
+            $domain = DomainNormalizer::fromUrl($url);
+        } catch (InvalidArgumentException $e) {
+            return null;
+        }
 
-        if ($existing = Store::query()->domainFilter($host)->first()) {
+        if ($existing = Store::query()->domainFilter($domain)->first()) {
             return $existing;
         }
 
@@ -97,18 +102,23 @@ class AutoCreateStore
             'user_id' => auth()->id(),
         ];
 
-        $host = strtolower(Uri::of($this->url)->host());
-
-        if (str_starts_with($host, 'www.')) {
-            $host = substr($host, 4);
+        // Extract and normalize domain
+        try {
+            $normalizedDomain = DomainNormalizer::fromUrl($this->url);
+        } catch (InvalidArgumentException $e) {
+            $this->errorLog('Failed to extract domain from URL', [
+                'url' => $this->url,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
         }
 
+        // Store only the normalized domain (without www)
         $attributes['domains'] = [
-            ['domain' => $host],
-            ['domain' => 'www.'.$host],
+            ['domain' => $normalizedDomain],
         ];
 
-        $attributes['name'] = ucfirst($host);
+        $attributes['name'] = ucfirst($normalizedDomain);
 
         $attributes['scrape_strategy'] = collect($this->strategyParse())
             ->mapWithKeys(function ($value, $key) {

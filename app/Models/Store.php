@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ScraperService;
+use App\Services\DomainNormalizer;
 use App\Services\Helpers\CurrencyHelper;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -15,6 +16,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -119,13 +121,25 @@ class Store extends Model
     public function scopeDomainFilter(Builder $query, string|array $domains): Builder
     {
         $domains = Arr::wrap($domains);
-        $first = array_shift($domains);
+        
+        // Normalize all input domains for consistent matching
+        $normalizedDomains = array_map(function ($domain) {
+            try {
+                return DomainNormalizer::normalize($domain);
+            } catch (InvalidArgumentException) {
+                // If normalization fails, return as-is for backward compatibility
+                return $domain;
+            }
+        }, $domains);
 
-        return $query->where(function (Builder $subQuery) use ($first, $domains) {
-            $subQuery->whereJsonContains('domains', ['domain' => $first]);
+        $first = array_shift($normalizedDomains);
 
-            foreach ($domains as $domain) {
-                $subQuery->orWhereJsonContains('domains', ['domain' => $domain]);
+        return $query->where(function (Builder $subQuery) use ($first, $normalizedDomains) {
+            // Note: whereJsonContains requires the full array structure for JSON arrays
+            $subQuery->whereJsonContains('domains', [['domain' => $first]]);
+
+            foreach ($normalizedDomains as $domain) {
+                $subQuery->orWhereJsonContains('domains', [['domain' => $domain]]);
             }
         });
     }

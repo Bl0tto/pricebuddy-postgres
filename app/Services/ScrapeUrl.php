@@ -219,7 +219,18 @@ class ScrapeUrl
 
     public function getStore(): ?Store
     {
-        $host = Uri::of($this->url)->host();
+        // Handle URLs with or without protocol
+        $url = $this->url;
+        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            $url = 'https://' . $url;
+        }
+
+        $host = Uri::of($url)->host();
+
+        // Guard against null host
+        if (empty($host)) {
+            return null;
+        }
 
         return Store::query()->domainFilter($host)->oldest()->first();
     }
