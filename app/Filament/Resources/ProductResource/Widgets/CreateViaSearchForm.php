@@ -148,7 +148,7 @@ class CreateViaSearchForm extends Widget implements HasForms
         if ($inProgress = $service->getInProgress()) {
             $this->inProgress = $inProgress;
 
-            Notification::make('searchJobAlreadyInProgress')
+            Notification::make()
                 ->title(__('Search job already in progress'))
                 ->body(__('Started '.Carbon::parse($inProgress)->diffForHumans()))
                 ->warning()
@@ -171,7 +171,7 @@ class CreateViaSearchForm extends Widget implements HasForms
 
         CacheSearchResults::dispatch($this->searchQuery);
 
-        Notification::make('searchJobDispatched')
+        Notification::make()
             ->title(__('Search job dispatched'))
             ->success()
             ->send();

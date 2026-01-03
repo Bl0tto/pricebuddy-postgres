@@ -147,7 +147,7 @@ class SearchProductSource extends EditRecord
 
         CacheSearchResults::dispatch($this->searchQuery, $source->id);
 
-        Notification::make('searchJobDispatched')
+        Notification::make()
             ->title(__('Search job dispatched'))
             ->success()
             ->send();
