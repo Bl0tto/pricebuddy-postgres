@@ -16,6 +16,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 
 /**
@@ -148,7 +149,7 @@ class CreateViaSearchForm extends Widget implements HasForms
         if ($inProgress = $service->getInProgress()) {
             $this->inProgress = $inProgress;
 
-            Notification::make()
+            Notification::make(Str::uuid()->toString())
                 ->title(__('Search job already in progress'))
                 ->body(__('Started '.Carbon::parse($inProgress)->diffForHumans()))
                 ->warning()
@@ -171,7 +172,7 @@ class CreateViaSearchForm extends Widget implements HasForms
 
         CacheSearchResults::dispatch($this->searchQuery);
 
-        Notification::make()
+        Notification::make(Str::uuid()->toString())
             ->title(__('Search job dispatched'))
             ->success()
             ->send();

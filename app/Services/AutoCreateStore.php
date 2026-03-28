@@ -33,15 +33,42 @@ class AutoCreateStore
         $this->strategies = config('price_buddy.auto_create_store_strategies', []);
 
         if (empty($html)) {
-            $this->scraperService = WebScraper::make($scraper)
+            $scraper_instance = WebScraper::make($scraper)
                 ->setConnectTimeout($timeout)
-                ->setRequestTimeout($timeout)
-                ->from($url)
-                ->get();
+                ->setRequestTimeout($timeout);
+
+            // Configure API scraper endpoint if needed
+            if ($scraper === self::ALT_SCRAPER) {
+                $scraper_instance->setScraperApiBaseUrl(
+                    config('price_buddy.scraper_api_url', 'http://scraper:3000')
+                );
+            }
+
+            $this->scraperService = $scraper_instance->from($url)->get();
             $this->html = $this->scraperService->getBody();
+
+            // Detect Cloudflare challenge and retry with API scraper
+            if ($this->isCloudflareChallenge($this->html) && $scraper !== self::ALT_SCRAPER) {
+                $this->scraperService = WebScraper::make(self::ALT_SCRAPER)
+                    ->setConnectTimeout($timeout)
+                    ->setRequestTimeout($timeout)
+                    ->setScraperApiBaseUrl(
+                        config('price_buddy.scraper_api_url', 'http://scraper:3000')
+                    )
+                    ->from($url)
+                    ->get();
+                $this->html = $this->scraperService->getBody();
+            }
         } else {
             $this->scraperService = WebScraper::make($scraper)->setBody($this->html);
         }
+    }
+    
+    protected function isCloudflareChallenge(string $html): bool
+    {
+        return str_contains($html, 'Just a moment...') 
+            || str_contains($html, 'Enable JavaScript and cookies to continue')
+            || str_contains($html, 'challenge-platform');
     }
 
     public static function new(string $url, ?string $html = null, string $scraper = self::DEFAULT_SCRAPER, int $timeout = 30): self
@@ -128,8 +155,13 @@ class AutoCreateStore
             })
             ->toArray();
 
+        // Use API scraper if Cloudflare protection detected
+        $scraperService = $this->isCloudflareChallenge($this->html) 
+            ? ScraperService::Api->value 
+            : ScraperService::Http->value;
+
         $attributes['settings'] = [
-            'scraper_service' => ScraperService::Http->value,
+            'scraper_service' => $scraperService,
             'scraper_service_settings' => '',
             'test_url' => $this->url,
             'locale_settings' => [

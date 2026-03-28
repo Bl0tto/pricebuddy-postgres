@@ -56,7 +56,7 @@ class SearchService
 
     public function build(string $searchQuery): self
     {
-        $this->searchQuery = $searchQuery;
+        $this->searchQuery = $this->sanitizeQuery($searchQuery);
 
         $this->logReset();
         $this->log('Starting research for: '.$searchQuery);
@@ -88,6 +88,15 @@ class SearchService
             ->setInProgress(false);
 
         return $this;
+    }
+
+    protected function sanitizeQuery(string $query): string
+    {
+        $query = trim($query);
+        $query = preg_replace('/[^\pL\pN\s\-\+\.]/u', '', $query) ?? '';
+        $query = preg_replace('/\s+/', ' ', $query) ?? '';
+
+        return trim($query);
     }
 
     public function getResults(): Collection
@@ -152,6 +161,12 @@ class SearchService
 
     public function getRawResults(): self
     {
+        if (! IntegrationHelper::isSearchEnabled()) {
+            $this->log('SearchXNG is disabled or missing a URL. Skipping SearchXNG results.');
+
+            return $this;
+        }
+
         $this->log('Fetching raw search results');
 
         $results = [];
@@ -174,12 +189,22 @@ class SearchService
 
     protected function getRawResultsForPage(int $page): array
     {
+        $searchUrl = $this->getSearchUrl();
+
+        if (! is_string($searchUrl) || trim($searchUrl) === '') {
+            $this->log(__('Error fetching results via SearchXNG: :error', [
+                'error' => 'Invalid or missing SearchXNG URL',
+            ]));
+
+            return [];
+        }
+
         try {
             return Cache::remember(
                 $this->getCacheKey('results', $this->searchQuery).':page-'.$page,
                 now()->addMinutes(self::CACHE_TTL_MINS),
                 fn () => Http::timeout(10)
-                    ->get($this->getSearchUrl(), [
+                    ->get($searchUrl, [
                         'format' => 'json',
                         'q' => $this->searchQuery,
                         'pageno' => $page,

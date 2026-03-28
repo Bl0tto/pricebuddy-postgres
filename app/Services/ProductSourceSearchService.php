@@ -49,7 +49,7 @@ class ProductSourceSearchService
         try {
             // For each result, instantiate a new scraper and extract the title and url.
             return $items->map(function ($item) use ($strategy) {
-                $itemScraper = WebScraper::http()->setBody($item);
+                $itemScraper = WebScraper::http()->setBody('<table>'.$item.'</table>');
 
                 return [
                     'title' => $this->scrapeOption($itemScraper, $strategy['product_title'])->first(),
@@ -101,7 +101,18 @@ class ProductSourceSearchService
 
     public function buildSearchUrl(string $query): string
     {
+        $query = $this->sanitizeQuery($query);
+
         return str_replace(':search_term', urlencode($query), $this->source->search_url);
+    }
+
+    protected function sanitizeQuery(string $query): string
+    {
+        $query = trim($query);
+        $query = preg_replace('/[^\pL\pN\s\-\+\.]/u', '', $query) ?? '';
+        $query = preg_replace('/\s+/', ' ', $query) ?? '';
+
+        return trim($query);
     }
 
     protected function scrapeOption(WebScraperInterface $scraper, array $options, bool $multiple = false): Collection
@@ -134,7 +145,7 @@ class ProductSourceSearchService
     {
         $url = $this->scrapeOption($scraper, $strategy['product_url'])->first();
 
-        if (! empty($strategy['product_url']['url_decode'])) {
+        if (! empty($strategy['product_url']['url_decode']) || ! empty($strategy['product_url']['decode_url'])) {
             $url = urldecode($url);
         }
 

@@ -75,7 +75,18 @@ class UrlResearch extends Model
             $urls = $urls->getRawResults();
         }
 
-        $urls = $urls->getResults()->pluck('url');
+        $urls = $urls->getResults()->pluck('url')->filter()->values();
+
+        if ($urls->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $existingCount = static::query()->whereIn('url', $urls)->count();
+
+        if ($existingCount === 0) {
+            // Populate UrlResearch if nothing exists for this query yet.
+            $service->build($searchQuery);
+        }
 
         return $query->whereIn('url', $urls);
     }
