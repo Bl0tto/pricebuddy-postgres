@@ -1,13 +1,19 @@
     version: "3.6"
     services:
 
+      # =============================================
+      # INFRASTRUCTURE
+      # =============================================
+
       portainer:
         image: portainer/portainer-ce:latest
         container_name: portainer
         restart: always
         command: -H unix:///var/run/docker.sock
         ports:
-          - "8000:9000"
+          - "9000:9000"
+          - "9443:9443"
+          - "8000:8000"
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
           - ${USERDIR}/docker/portainer/data:/data
@@ -17,42 +23,100 @@
         networks:
           - htpc-net
 
-      organizr:
-        container_name: organizr
-        restart: always
-        image: organizr/organizr
-        volumes:
-          - ${USERDIR}/docker/organizr:/config
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8001:80"
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
       watchtower:
         container_name: watchtower
         restart: always
-        image: v2tec/watchtower
+        image: containrrr/watchtower:latest
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
         command: --schedule "0 0 4 * * *" --cleanup
         networks:
           - htpc-net
 
-      nzbget:
-        image: "linuxserver/nzbget"
-        container_name: "nzbget"
+      postgres:
+        container_name: postgres
+        image: postgres:15
+        environment:
+          - POSTGRES_USER=${POSTGRES_SUPERUSER}
+          - POSTGRES_PASSWORD=${POSTGRES_SUPERPASS}
         volumes:
-          - ${USERDIR}/docker/nzbget:/config
-          - ${USERDIR}/Downloads:/downloads
-          - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
+          - ${USERDIR}/docker/postgres:/var/lib/postgresql/data
+        networks:
+          - htpc-net
+        restart: unless-stopped
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          interval: 10s
+          timeout: 5s
+          retries: 10
+          start_period: 120s
+
+      pihole:
+        image: pihole/pihole:latest
+        container_name: pihole
+        restart: unless-stopped
+        ports:
+          - "192.168.10.243:53:53/tcp"
+          - "192.168.10.243:53:53/udp"
+          - "8053:80"
+        environment:
+          - TZ=${TZ}
+          - WEBPASSWORD=${PIHOLE_WEBPASSWORD}
+          - FTLCONF_LOCAL_IPV4=192.168.10.243
+        volumes:
+          - ${USERDIR}/docker/pihole/etc:/etc/pihole
+          - ${USERDIR}/docker/pihole/dnsmasq:/etc/dnsmasq.d
+        networks:
+          - htpc-net
+
+      # =============================================
+      # MEDIA STACK
+      # =============================================
+
+      plexms:
+        container_name: plexms
+        restart: always
+        image: plexinc/pms-docker
+        volumes:
+          - ${USERDIR}/docker/plexms:/config
+          - ${USERDIR}/Downloads/plex_tmp:/transcode
+          - ${USERDIR}/media/music:/music
+          - ${USERDIR}/media/movies:/movies
+          - ${USERDIR}/media/tvseries:/tvseries
+          - ${USERDIR}/media/toons:/toons
           - ${USERDIR}/docker/shared:/shared
         ports:
-          - "8002:6789"
+          - "32400:32400/tcp"
+          - "3005:3005/tcp"
+          - "8324:8324/tcp"
+          - "32469:32469/tcp"
+          - "1900:1900/udp"
+          - "32410:32410/udp"
+          - "32412:32412/udp"
+          - "32413:32413/udp"
+          - "32414:32414/udp"
+        environment:
+          - TZ=${TZ}
+          - HOSTNAME=DockerPlex
+          - PLEX_UID=${PUID}
+          - PLEX_GID=${PGID}
+          - ADVERTISE_IP=http://192.168.10.243:32400/
+        networks:
+          - htpc-net
+
+      sonarr:
+        image: "linuxserver/sonarr"
+        hostname: sonarr
+        container_name: "sonarr"
+        volumes:
+          - ${USERDIR}/docker/sonarr:/config
+          - ${USERDIR}/Downloads:/downloads
+          - ${USERDIR}/media/tvseries:/tvseries
+          - ${USERDIR}/media/toons:/toons
+          - "/etc/localtime:/etc/localtime:ro"
+          - ${USERDIR}/docker/shared:/shared
+        ports:
+          - "8004:8989"
         restart: always
         environment:
           - PUID=${PUID}
@@ -72,27 +136,6 @@
           - ${USERDIR}/docker/shared:/shared
         ports:
           - "8003:7878"
-        restart: always
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      sonarr:
-        image: "linuxserver/sonarr"
-        hostname: sonarr
-        container_name: "sonarr"
-        volumes:
-          - ${USERDIR}/docker/sonarr:/config
-          - ${USERDIR}/Downloads:/downloads
-          - ${USERDIR}/media/tvseries:/tvseries
-          - ${USERDIR}/media/toons:/toons
-          - "/etc/localtime:/etc/localtime:ro"
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-            - "8004:8989"
         restart: always
         environment:
           - PUID=${PUID}
@@ -121,94 +164,66 @@
         networks:
           - htpc-net
 
-      plexms:
-        container_name: plexms
-        restart: always
-        image: plexinc/pms-docker
+      nzbget:
+        image: "linuxserver/nzbget"
+        container_name: "nzbget"
         volumes:
-          - ${USERDIR}/docker/plexms:/config
-          - ${USERDIR}/Downloads/plex_tmp:/transcode
-          - ${USERDIR}/media/music:/music
-          - ${USERDIR}/media/movies:/movies
-          - ${USERDIR}/media/tvseries:/tvseries
-          - ${USERDIR}/media/toons:/toons
+          - ${USERDIR}/docker/nzbget:/config
+          - ${USERDIR}/Downloads:/downloads
+          - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
           - ${USERDIR}/docker/shared:/shared
         ports:
-          - "32400:32400/tcp"
-          - "3005:3005/tcp"
-          - "8324:8324/tcp"
-          - "32469:32469/tcp"
-          - "1900:1900/udp"
-          - "32410:32410/udp"
-          - "32412:32412/udp"
-          - "32413:32413/udp"
-          - "32414:32414/udp"
-        environment:
-          - TZ=${TZ}
-          - HOSTNAME=DockerPlex
-          - PLEX_CLAIM=claim-geRZpcypCzn_CPpnfhzB
-          - PLEX_UID=${PUID}
-          - PLEX_GID=${PGID}
-          - ADVERTISE_IP=http://192.168.10.243:32400/
-        networks:
-          - htpc-net
-
-      ombi:
-        container_name: ombi
+          - "8002:6789"
         restart: always
-        image: linuxserver/ombi
-        volumes:
-          - ${USERDIR}/docker/ombi:/config
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8006:3579"
         environment:
-          # Database
-          - DB_TYPE=postgresdb
-          - DB_POSTGRESDB_HOST=postgres
-          - DB_POSTGRESDB_PORT=5432
-          - DB_POSTGRESDB_DATABASE=${OMBI_DB_NAME}
-          - DB_POSTGRESDB_USER=${OMBI_DB_USER}
-          - DB_POSTGRESDB_PASSWORD=${OMBI_DB_PASSWORD}
           - PUID=${PUID}
           - PGID=${PGID}
           - TZ=${TZ}
         networks:
           - htpc-net
 
-      homeassistant:
-        container_name: homeassistant
-        image: "ghcr.io/home-assistant/home-assistant:stable"
+      overseerr:
+        image: sctx/overseerr:latest
+        container_name: overseerr
+        restart: unless-stopped
+        ports:
+          - "8007:5055"
         volumes:
-          - ${USERDIR}/docker/homeassistant:/config
-          - "/etc/localtime:/etc/localtime:ro"
-          - "/run/dbus:/run/dbus:ro"
-        restart: always
-        network_mode: host
-
-      postgres:
-        container_name: postgres
-        image: postgres:15
+          - ${USERDIR}/docker/overseerr:/app/config
         environment:
-          - POSTGRES_USER=${POSTGRES_SUPERUSER}
-          - POSTGRES_PASSWORD=${POSTGRES_SUPERPASS}
-        volumes:
-          - ${USERDIR}/docker/postgres:/var/lib/postgresql/data
+          - PUID=${PUID}
+          - PGID=${PGID}
+          - TZ=${TZ}
+          - LOG_LEVEL=info
         networks:
           - htpc-net
-        restart: unless-stopped
-        healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U postgres"]
-          interval: 10s
-          timeout: 5s
-          retries: 5
+
+      organizr:
+        container_name: organizr
+        restart: always
+        image: organizr/organizr
+        volumes:
+          - ${USERDIR}/docker/organizr:/config
+          - ${USERDIR}/docker/shared:/shared
+        ports:
+          - "8001:80"
+        environment:
+          - PUID=${PUID}
+          - PGID=${PGID}
+          - TZ=${TZ}
+        networks:
+          - htpc-net
+
+      # =============================================
+      # AUTOMATION & TOOLS
+      # =============================================
 
       n8n:
         container_name: n8n
         image: n8nio/n8n:latest
         restart: unless-stopped
         ports:
-          - "8020:5678"
+          - "8010:5678"
         environment:
           # Database
           - DB_TYPE=postgresdb
@@ -229,7 +244,8 @@
           - N8N_HOST=192.168.10.243
           - N8N_PORT=5678
           - N8N_PROTOCOL=http
-          - WEBHOOK_URL=http://192.168.10.243:8020
+          - N8N_EDITOR_BASE_URL=https://n8n.schmidtzahoffaheffawessen.com
+          - WEBHOOK_URL=https://n8n.schmidtzahoffaheffawessen.com
 
           # General
           - GENERIC_TIMEZONE=${TZ}
@@ -242,17 +258,44 @@
         networks:
           - htpc-net
 
+      searxng:
+        image: searxng/searxng:latest
+        container_name: searxng
+        restart: unless-stopped
+        ports:
+          - "8020:8080"
+        environment:
+          - TZ=${TZ}
+          - SEARXNG_BASE_URL=http://192.168.10.243:8020/
+        volumes:
+          - ${USERDIR}/docker/searxng:/etc/searxng
+        networks:
+          - htpc-net
+
+      scraper:
+        image: jez500/seleniumbase-scrapper:latest
+        container_name: scraper
+        restart: unless-stopped
+        shm_size: "1gb"
+        ports:
+          - "8012:3000"
+        networks:
+          - htpc-net
+
       pricebuddy:
-        image: jez500/pricebuddy:latest
+        #image: jez500/pricebuddy:latest
+        build:
+          context: /home/casa/src/pricebuddy-postgres
+          dockerfile: docker/php.dockerfile
         container_name: pricebuddy
         restart: unless-stopped
         ports:
-          - "8021:80"
+          - "8011:80"
         volumes:
+          - ${USERDIR}/src/pricebuddy-postgres/app:/app/app
           - ${USERDIR}/docker/pricebuddy/data:/app/data
           - ${USERDIR}/docker/pricebuddy/storage:/app/storage
           - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-
         environment:
           # --- Database (PostgreSQL) ---
           - DB_CONNECTION=pgsql
@@ -265,9 +308,10 @@
           # --- App ---
           - APP_ENV=production
           - APP_DEBUG="true"
-         #   - APP_URL=https://pricebuddy.schmidtzahoffaheffawessen.com
-          - APP_URL=http://192.168.10.243:8021
+          #   - APP_URL=https://pricebuddy.schmidtzahoffaheffawessen.com
+          - APP_URL=http://192.168.10.243:8011
           - APP_KEY=${PRICEBUDDY_APP_KEY}
+          - PRICE_BUDDY_SCRAPER_API_URL=${PRICE_BUDDY_SCRAPER_API_URL}
           - TZ=${TZ}
           - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
            # --- SMTP ---
@@ -283,23 +327,50 @@
         networks:
           - htpc-net
 
+      # =============================================
+      # HOME AUTOMATION
+      # =============================================
 
-      headscale:
-        image: headscale/headscale:v0.26 # Use of version instead of 'latest' avoids breaking changes
-        container_name: headscale
-        command: serve
+      homeassistant:
+        container_name: homeassistant
+        image: "ghcr.io/home-assistant/home-assistant:stable"
+        volumes:
+          - ${USERDIR}/docker/homeassistant:/config
+          - "/etc/localtime:/etc/localtime:ro"
+          - "/run/dbus:/run/dbus:ro"
+        restart: always
+        network_mode: host
+
+      # =============================================
+      # REMOTE ACCESS
+      # =============================================
+
+      tailscale:
+        image: tailscale/tailscale:latest
+        container_name: tailscale
+        hostname: mi-casa-htpc
+        restart: unless-stopped
+        environment:
+          - TS_AUTHKEY=${TS_AUTHKEY}
+          - TS_EXTRA_ARGS=--advertise-exit-node --advertise-routes=192.168.10.0/24 --accept-routes
+          - TS_STATE_DIR=/var/lib/tailscale
+        volumes:
+          - ${USERDIR}/docker/tailscale:/var/lib/tailscale
+          - /dev/net/tun:/dev/net/tun
+        cap_add:
+          - NET_ADMIN
+          - SYS_MODULE
+        network_mode: host
+
+      cloudflared:
+        image: cloudflare/cloudflared:latest
+        container_name: cloudflared
+        restart: unless-stopped
+        command: tunnel --no-autoupdate run
+        environment:
+          - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
         networks:
           - htpc-net
-        ports:
-          - '8030:8080' # Headscale API/WebSockets
-          - '8031:9090' # Metrics (optional)
-          # - '3478:3478/udp' # Uncomment if you enable STUN in config.yaml and want to expose it
-        restart: unless-stopped
-        volumes:
-          - ${USERDIR}/docker/headscale/config:/etc/headscale
-          - ${USERDIR}/docker/headscale/data:/var/lib/headscale
-        environment:
-          TZ: ${TZ}
 
       caddy:
         image: caddy:latest
@@ -308,34 +379,18 @@
         ports:
           - "8040:80"
           - "8043:443"
-          - "8043:443/udp" # For HTTP/3 (QUIC) if desired
+          - "8043:443/udp"
         volumes:
-          - ${USERDIR}/docker/caddy:/etc/Caddyfile
-          - ${USERDIR}/docker/caddy:/data
-          - ${USERDIR}/docker/caddy:/config
-        depends_on:
-          - headscale
+          - ${USERDIR}/docker/caddy/Caddyfile:/etc/caddy/Caddyfile
+          - caddy_data:/data
+          - caddy_config:/config
         networks:
           - htpc-net
 
-      cloudflare-ddns-v2:
-        image: tjhackz/cloudflare-ddns-v2:latest # Use :amd64 or :latest if your HTPC is not ARM
-        container_name: cloudflare-ddns-v2
-        security_opt:
-          - no-new-privileges:true
-        network_mode: "host" # Allows the container to see the host's public IP directly
-        environment:
-          # PUID and PGID ensure the container runs with the correct user/group permissions
-          # to access the mounted volume if needed, though for a single config file,
-          # it's less critical than for application data.
-          # You can find your user's PUID/PGID by running 'id -u' and 'id -g' on your HTPC.
-          - PUID=1000
-          - PGID=1000
-        volumes:
-          # Mount your config.json file into the container.
-          # Replace /PATH/TO/HOST/config.json with the actual path to your config.json file on your HTPC.
-          - ${USERDIR}/docker/cloudflare-ddns/config.json:/config.json:ro # Mount as read-only for security
-        restart: unless-stopped
+    # =============================================
+    # VOLUMES & NETWORKS
+    # =============================================
+
     volumes:
       caddy_data:
       caddy_config:
