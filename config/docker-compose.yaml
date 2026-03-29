@@ -1,400 +1,400 @@
-    version: "3.6"
-    services:
+version: "3.6"
+services:
 
-      # =============================================
-      # INFRASTRUCTURE
-      # =============================================
+  # =============================================
+  # INFRASTRUCTURE
+  # =============================================
 
-      portainer:
-        image: portainer/portainer-ce:latest
-        container_name: portainer
-        restart: always
-        command: -H unix:///var/run/docker.sock
-        ports:
-          - "9000:9000"
-          - "9443:9443"
-          - "8000:8000"
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-          - ${USERDIR}/docker/portainer/data:/data
-          - ${USERDIR}/docker/shared:/shared
-        environment:
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      watchtower:
-        container_name: watchtower
-        restart: always
-        image: containrrr/watchtower:latest
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-        command: --schedule "0 0 4 * * *" --cleanup
-        networks:
-          - htpc-net
-
-      postgres:
-        container_name: postgres
-        image: postgres:15
-        environment:
-          - POSTGRES_USER=${POSTGRES_SUPERUSER}
-          - POSTGRES_PASSWORD=${POSTGRES_SUPERPASS}
-        volumes:
-          - ${USERDIR}/docker/postgres:/var/lib/postgresql/data
-        networks:
-          - htpc-net
-        restart: unless-stopped
-        healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U postgres"]
-          interval: 10s
-          timeout: 5s
-          retries: 10
-          start_period: 120s
-
-      pihole:
-        image: pihole/pihole:latest
-        container_name: pihole
-        restart: unless-stopped
-        ports:
-          - "192.168.10.243:53:53/tcp"
-          - "192.168.10.243:53:53/udp"
-          - "8053:80"
-        environment:
-          - TZ=${TZ}
-          - WEBPASSWORD=${PIHOLE_WEBPASSWORD}
-          - FTLCONF_LOCAL_IPV4=192.168.10.243
-        volumes:
-          - ${USERDIR}/docker/pihole/etc:/etc/pihole
-          - ${USERDIR}/docker/pihole/dnsmasq:/etc/dnsmasq.d
-        networks:
-          - htpc-net
-
-      # =============================================
-      # MEDIA STACK
-      # =============================================
-
-      plexms:
-        container_name: plexms
-        restart: always
-        image: plexinc/pms-docker
-        volumes:
-          - ${USERDIR}/docker/plexms:/config
-          - ${USERDIR}/Downloads/plex_tmp:/transcode
-          - ${USERDIR}/media/music:/music
-          - ${USERDIR}/media/movies:/movies
-          - ${USERDIR}/media/tvseries:/tvseries
-          - ${USERDIR}/media/toons:/toons
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "32400:32400/tcp"
-          - "3005:3005/tcp"
-          - "8324:8324/tcp"
-          - "32469:32469/tcp"
-          - "1900:1900/udp"
-          - "32410:32410/udp"
-          - "32412:32412/udp"
-          - "32413:32413/udp"
-          - "32414:32414/udp"
-        environment:
-          - TZ=${TZ}
-          - HOSTNAME=DockerPlex
-          - PLEX_UID=${PUID}
-          - PLEX_GID=${PGID}
-          - ADVERTISE_IP=http://192.168.10.243:32400/
-        networks:
-          - htpc-net
-
-      sonarr:
-        image: "linuxserver/sonarr"
-        hostname: sonarr
-        container_name: "sonarr"
-        volumes:
-          - ${USERDIR}/docker/sonarr:/config
-          - ${USERDIR}/Downloads:/downloads
-          - ${USERDIR}/media/tvseries:/tvseries
-          - ${USERDIR}/media/toons:/toons
-          - "/etc/localtime:/etc/localtime:ro"
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8004:8989"
-        restart: always
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      radarr:
-        image: "linuxserver/radarr"
-        container_name: "radarr"
-        volumes:
-          - ${USERDIR}/docker/radarr:/config
-          - ${USERDIR}/Downloads:/downloads
-          - ${USERDIR}/media/movies:/movies
-          - "/etc/localtime:/etc/localtime:ro"
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8003:7878"
-        restart: always
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      lidarr:
-        image: "linuxserver/lidarr"
-        hostname: lidarr
-        container_name: "lidarr"
-        volumes:
-          - ${USERDIR}/docker/lidarr:/config
-          - ${USERDIR}/Downloads:/downloads
-          - ${USERDIR}/media/music:/music
-          - "/etc/localtime:/etc/localtime:ro"
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8005:8686"
-        restart: always
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      nzbget:
-        image: "linuxserver/nzbget"
-        container_name: "nzbget"
-        volumes:
-          - ${USERDIR}/docker/nzbget:/config
-          - ${USERDIR}/Downloads:/downloads
-          - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8002:6789"
-        restart: always
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      overseerr:
-        image: sctx/overseerr:latest
-        container_name: overseerr
-        restart: unless-stopped
-        ports:
-          - "8007:5055"
-        volumes:
-          - ${USERDIR}/docker/overseerr:/app/config
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-          - LOG_LEVEL=info
-        networks:
-          - htpc-net
-
-      organizr:
-        container_name: organizr
-        restart: always
-        image: organizr/organizr
-        volumes:
-          - ${USERDIR}/docker/organizr:/config
-          - ${USERDIR}/docker/shared:/shared
-        ports:
-          - "8001:80"
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-        networks:
-          - htpc-net
-
-      # =============================================
-      # AUTOMATION & TOOLS
-      # =============================================
-
-      n8n:
-        container_name: n8n
-        image: n8nio/n8n:latest
-        restart: unless-stopped
-        ports:
-          - "8010:5678"
-        environment:
-          # Database
-          - DB_TYPE=postgresdb
-          - DB_POSTGRESDB_HOST=postgres
-          - DB_POSTGRESDB_PORT=5432
-          - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME}
-          - DB_POSTGRESDB_USER=${N8N_DB_USER}
-          - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
-
-          # Security
-          - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-          - N8N_BASIC_AUTH_ACTIVE=true
-          - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
-          - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
-          - N8N_SECURE_COOKIE=false
-
-          # Server Config
-          - N8N_HOST=192.168.10.243
-          - N8N_PORT=5678
-          - N8N_PROTOCOL=http
-          - N8N_EDITOR_BASE_URL=https://n8n.schmidtzahoffaheffawessen.com
-          - WEBHOOK_URL=https://n8n.schmidtzahoffaheffawessen.com
-
-          # General
-          - GENERIC_TIMEZONE=${TZ}
-          - N8N_LOG_LEVEL=info
-        volumes:
-          - ${USERDIR}/docker/n8n:/home/node/.n8n
-        depends_on:
-          postgres:
-            condition: service_healthy
-        networks:
-          - htpc-net
-
-      searxng:
-        image: searxng/searxng:latest
-        container_name: searxng
-        restart: unless-stopped
-        ports:
-          - "8020:8080"
-        environment:
-          - TZ=${TZ}
-          - SEARXNG_BASE_URL=http://192.168.10.243:8020/
-        volumes:
-          - ${USERDIR}/docker/searxng:/etc/searxng
-        networks:
-          - htpc-net
-
-      scraper:
-        image: jez500/seleniumbase-scrapper:latest
-        container_name: scraper
-        restart: unless-stopped
-        shm_size: "1gb"
-        ports:
-          - "8012:3000"
-        networks:
-          - htpc-net
-
-      pricebuddy:
-        #image: jez500/pricebuddy:latest
-        build:
-          context: /home/casa/src/pricebuddy-postgres
-          dockerfile: docker/php.dockerfile
-        container_name: pricebuddy
-        restart: unless-stopped
-        ports:
-          - "8011:80"
-        volumes:
-          - ${USERDIR}/src/pricebuddy-postgres/app:/app/app
-          - ${USERDIR}/docker/pricebuddy/data:/app/data
-          - ${USERDIR}/docker/pricebuddy/storage:/app/storage
-          - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-        environment:
-          # --- Database (PostgreSQL) ---
-          - DB_CONNECTION=pgsql
-          - DB_HOST=postgres
-          - DB_PORT=5432
-          - DB_DATABASE=${PRICEBUDDY_DB_NAME}
-          - DB_USERNAME=${PRICEBUDDY_DB_USER}
-          - DB_PASSWORD=${PRICEBUDDY_DB_PASSWORD}
-
-          # --- App ---
-          - APP_ENV=production
-          - APP_DEBUG="true"
-          #   - APP_URL=https://pricebuddy.schmidtzahoffaheffawessen.com
-          - APP_URL=http://192.168.10.243:8011
-          - APP_KEY=${PRICEBUDDY_APP_KEY}
-          - PRICE_BUDDY_SCRAPER_API_URL=${PRICE_BUDDY_SCRAPER_API_URL}
-          - TZ=${TZ}
-          - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-           # --- SMTP ---
-          - SMTP_HOST=${SMTP_HOST}
-          - SMTP_PORT=${SMTP_PORT}
-          - SMTP_USER=${SMTP_USER}
-          - SMTP_PASS=${SMTP_PASS}
-          - SMTP_FROM=${SMTP_FROM}
-
-        depends_on:
-          postgres:
-            condition: service_healthy
-        networks:
-          - htpc-net
-
-      # =============================================
-      # HOME AUTOMATION
-      # =============================================
-
-      homeassistant:
-        container_name: homeassistant
-        image: "ghcr.io/home-assistant/home-assistant:stable"
-        volumes:
-          - ${USERDIR}/docker/homeassistant:/config
-          - "/etc/localtime:/etc/localtime:ro"
-          - "/run/dbus:/run/dbus:ro"
-        restart: always
-        network_mode: host
-
-      # =============================================
-      # REMOTE ACCESS
-      # =============================================
-
-      tailscale:
-        image: tailscale/tailscale:latest
-        container_name: tailscale
-        hostname: mi-casa-htpc
-        restart: unless-stopped
-        environment:
-          - TS_AUTHKEY=${TS_AUTHKEY}
-          - TS_EXTRA_ARGS=--advertise-exit-node --advertise-routes=192.168.10.0/24 --accept-routes
-          - TS_STATE_DIR=/var/lib/tailscale
-        volumes:
-          - ${USERDIR}/docker/tailscale:/var/lib/tailscale
-          - /dev/net/tun:/dev/net/tun
-        cap_add:
-          - NET_ADMIN
-          - SYS_MODULE
-        network_mode: host
-
-      cloudflared:
-        image: cloudflare/cloudflared:latest
-        container_name: cloudflared
-        restart: unless-stopped
-        command: tunnel --no-autoupdate run
-        environment:
-          - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
-        networks:
-          - htpc-net
-
-      caddy:
-        image: caddy:latest
-        container_name: caddy
-        restart: unless-stopped
-        ports:
-          - "8040:80"
-          - "8043:443"
-          - "8043:443/udp"
-        volumes:
-          - ${USERDIR}/docker/caddy/Caddyfile:/etc/caddy/Caddyfile
-          - caddy_data:/data
-          - caddy_config:/config
-        networks:
-          - htpc-net
-
-    # =============================================
-    # VOLUMES & NETWORKS
-    # =============================================
-
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    command: -H unix:///var/run/docker.sock
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+      - "8000:8000"
     volumes:
-      caddy_data:
-      caddy_config:
-
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERDIR}/docker/portainer/data:/data
+      - ${USERDIR}/docker/shared:/shared
+    environment:
+      - TZ=${TZ}
     networks:
-      htpc-net:
-        driver: bridge
+      - htpc-net
+
+  watchtower:
+    container_name: watchtower
+    restart: always
+    image: containrrr/watchtower:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --schedule "0 0 4 * * *" --cleanup
+    networks:
+      - htpc-net
+
+  postgres:
+    container_name: postgres
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${POSTGRES_SUPERUSER}
+      - POSTGRES_PASSWORD=${POSTGRES_SUPERPASS}
+    volumes:
+      - ${USERDIR}/docker/postgres:/var/lib/postgresql/data
+    networks:
+      - htpc-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    ports:
+      - "192.168.10.243:53:53/tcp"
+      - "192.168.10.243:53:53/udp"
+      - "8053:80"
+    environment:
+      - TZ=${TZ}
+      - WEBPASSWORD=${PIHOLE_WEBPASSWORD}
+      - FTLCONF_LOCAL_IPV4=192.168.10.243
+    volumes:
+      - ${USERDIR}/docker/pihole/etc:/etc/pihole
+      - ${USERDIR}/docker/pihole/dnsmasq:/etc/dnsmasq.d
+    networks:
+      - htpc-net
+
+  # =============================================
+  # MEDIA STACK
+  # =============================================
+
+  plexms:
+    container_name: plexms
+    restart: always
+    image: plexinc/pms-docker
+    volumes:
+      - ${USERDIR}/docker/plexms:/config
+      - ${USERDIR}/Downloads/plex_tmp:/transcode
+      - ${USERDIR}/media/music:/music
+      - ${USERDIR}/media/movies:/movies
+      - ${USERDIR}/media/tvseries:/tvseries
+      - ${USERDIR}/media/toons:/toons
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "32400:32400/tcp"
+      - "3005:3005/tcp"
+      - "8324:8324/tcp"
+      - "32469:32469/tcp"
+      - "1900:1900/udp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+    environment:
+      - TZ=${TZ}
+      - HOSTNAME=DockerPlex
+      - PLEX_UID=${PUID}
+      - PLEX_GID=${PGID}
+      - ADVERTISE_IP=http://192.168.10.243:32400/
+    networks:
+      - htpc-net
+
+  sonarr:
+    image: "linuxserver/sonarr"
+    hostname: sonarr
+    container_name: "sonarr"
+    volumes:
+      - ${USERDIR}/docker/sonarr:/config
+      - ${USERDIR}/Downloads:/downloads
+      - ${USERDIR}/media/tvseries:/tvseries
+      - ${USERDIR}/media/toons:/toons
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8004:8989"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - htpc-net
+
+  radarr:
+    image: "linuxserver/radarr"
+    container_name: "radarr"
+    volumes:
+      - ${USERDIR}/docker/radarr:/config
+      - ${USERDIR}/Downloads:/downloads
+      - ${USERDIR}/media/movies:/movies
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8003:7878"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - htpc-net
+
+  lidarr:
+    image: "linuxserver/lidarr"
+    hostname: lidarr
+    container_name: "lidarr"
+    volumes:
+      - ${USERDIR}/docker/lidarr:/config
+      - ${USERDIR}/Downloads:/downloads
+      - ${USERDIR}/media/music:/music
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8005:8686"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - htpc-net
+
+  nzbget:
+    image: "linuxserver/nzbget"
+    container_name: "nzbget"
+    volumes:
+      - ${USERDIR}/docker/nzbget:/config
+      - ${USERDIR}/Downloads:/downloads
+      - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8002:6789"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - htpc-net
+
+  overseerr:
+    image: sctx/overseerr:latest
+    container_name: overseerr
+    restart: unless-stopped
+    ports:
+      - "8007:5055"
+    volumes:
+      - ${USERDIR}/docker/overseerr:/app/config
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - LOG_LEVEL=info
+    networks:
+      - htpc-net
+
+  organizr:
+    container_name: organizr
+    restart: always
+    image: organizr/organizr
+    volumes:
+      - ${USERDIR}/docker/organizr:/config
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8001:80"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - htpc-net
+
+  # =============================================
+  # AUTOMATION & TOOLS
+  # =============================================
+
+  n8n:
+    container_name: n8n
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "8010:5678"
+    environment:
+      # Database
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME}
+      - DB_POSTGRESDB_USER=${N8N_DB_USER}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
+
+      # Security
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_SECURE_COOKIE=false
+
+      # Server Config
+      - N8N_HOST=192.168.10.243
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_EDITOR_BASE_URL=https://n8n.schmidtzahoffaheffawessen.com
+      - WEBHOOK_URL=https://n8n.schmidtzahoffaheffawessen.com
+
+      # General
+      - GENERIC_TIMEZONE=${TZ}
+      - N8N_LOG_LEVEL=info
+    volumes:
+      - ${USERDIR}/docker/n8n:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - htpc-net
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "8020:8080"
+    environment:
+      - TZ=${TZ}
+      - SEARXNG_BASE_URL=http://192.168.10.243:8020/
+    volumes:
+      - ${USERDIR}/docker/searxng:/etc/searxng
+    networks:
+      - htpc-net
+
+  scraper:
+    image: jez500/seleniumbase-scrapper:latest
+    container_name: scraper
+    restart: unless-stopped
+    shm_size: "1gb"
+    ports:
+      - "8012:3000"
+    networks:
+      - htpc-net
+
+  pricebuddy:
+    #image: jez500/pricebuddy:latest
+    build:
+      context: /home/casa/src/pricebuddy-postgres
+      dockerfile: docker/php.dockerfile
+    container_name: pricebuddy
+    restart: unless-stopped
+    ports:
+      - "8011:80"
+    volumes:
+      - ${USERDIR}/src/pricebuddy-postgres/app:/app/app
+      - ${USERDIR}/docker/pricebuddy/data:/app/data
+      - ${USERDIR}/docker/pricebuddy/storage:/app/storage
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    environment:
+      # --- Database (PostgreSQL) ---
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${PRICEBUDDY_DB_NAME}
+      - DB_USERNAME=${PRICEBUDDY_DB_USER}
+      - DB_PASSWORD=${PRICEBUDDY_DB_PASSWORD}
+
+      # --- App ---
+      - APP_ENV=production
+      - APP_DEBUG="true"
+      #   - APP_URL=https://pricebuddy.schmidtzahoffaheffawessen.com
+      - APP_URL=http://192.168.10.243:8011
+      - APP_KEY=${PRICEBUDDY_APP_KEY}
+      - PRICE_BUDDY_SCRAPER_API_URL=${PRICE_BUDDY_SCRAPER_API_URL}
+      - TZ=${TZ}
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+      # --- SMTP ---
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - htpc-net
+
+  # =============================================
+  # HOME AUTOMATION
+  # =============================================
+
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - ${USERDIR}/docker/homeassistant:/config
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/run/dbus:/run/dbus:ro"
+    restart: always
+    network_mode: host
+
+  # =============================================
+  # REMOTE ACCESS
+  # =============================================
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: mi-casa-htpc
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_EXTRA_ARGS=--advertise-exit-node --advertise-routes=192.168.10.0/24 --accept-routes
+      - TS_STATE_DIR=/var/lib/tailscale
+    volumes:
+      - ${USERDIR}/docker/tailscale:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    network_mode: host
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    networks:
+      - htpc-net
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "8040:80"
+      - "8043:443"
+      - "8043:443/udp"
+    volumes:
+      - ${USERDIR}/docker/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - htpc-net
+
+# =============================================
+# VOLUMES & NETWORKS
+# =============================================
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  htpc-net:
+    driver: bridge
