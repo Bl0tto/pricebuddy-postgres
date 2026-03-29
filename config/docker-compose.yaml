@@ -2,7 +2,7 @@
     services:
 
       portainer:
-        image: portainer/portainer
+        image: portainer/portainer-ce:latest
         container_name: portainer
         restart: always
         command: -H unix:///var/run/docker.sock
@@ -250,6 +250,8 @@
           - "8021:80"
         volumes:
           - ${USERDIR}/docker/pricebuddy/data:/app/data
+          - ${USERDIR}/docker/pricebuddy/storage:/app/storage
+          - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
 
         environment:
           # --- Database (PostgreSQL) ---
@@ -267,6 +269,7 @@
           - APP_URL=http://192.168.10.243:8021
           - APP_KEY=${PRICEBUDDY_APP_KEY}
           - TZ=${TZ}
+          - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
            # --- SMTP ---
           - SMTP_HOST=${SMTP_HOST}
           - SMTP_PORT=${SMTP_PORT}
