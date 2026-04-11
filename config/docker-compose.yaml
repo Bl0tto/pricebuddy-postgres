@@ -1,6 +1,5 @@
 version: "3.6"
 services:
-
   # =============================================
   # INFRASTRUCTURE
   # =============================================
@@ -327,6 +326,21 @@ services:
     networks:
       - htpc-net
 
+    fincept-terminal:
+      image: ghcr.io/fincept-corporation/fincept-terminal:latest
+      container_name: fincept-terminal
+      restart: unless-stopped
+      stdin_open: true
+      tty: true
+      environment:
+        - TZ=${TZ}
+        - DISPLAY=${DISPLAY:-:0}
+      volumes:
+        - /tmp/.X11-unix:/tmp/.X11-unix
+      networks:
+        - htpc-net
+      profiles:
+        - gui-tools
   # =============================================
   # HOME AUTOMATION
   # =============================================
